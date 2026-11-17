@@ -26,12 +26,21 @@ from loguru import logger
 from app.schemas import HealthResponse, MachineInput, PredictionResponse
 
 import pandas as pd
+import time
 
 MODEL_PATH = Path(__file__).resolve().parents[1] / "model" / "model.joblib"
 
 # Mémoire d'application — peuplée par le lifespan
 state: dict[str, Any] = {}
 
+logger.add(
+    "logs/api.log",
+    rotation="5 MB",
+    retention="7 days",
+    compression="zip",
+    level="INFO",
+    enqueue=True
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -82,53 +91,33 @@ def health() -> HealthResponse:
     )
 
 
+"""Prédit la criticité d'une machine à partir de ses caractéristiques.
+
+Args:
+    item: caractéristiques de la machine (cf. `schemas.MachineInput`).
+
+Returns:
+    PredictionResponse avec la classe prédite et les probabilités.
+ """
 @app.post("/predict", response_model=PredictionResponse)
 def predict(item: MachineInput) -> PredictionResponse:
-    
-    logger.info("Lance Post predict ")
-    """Prédit la criticité d'une machine à partir de ses caractéristiques.
-
-    🎯 **À COMPLÉTER PAR L'APPRENANT.**
-
-    Indices d'implémentation :
-
-    1. Construire un DataFrame pandas à 1 ligne à partir de `item.model_dump()`.
-       Le pipeline scikit-learn attend les colonnes dans le même ordre qu'à
-       l'entraînement (cf. `model/train_baseline.py`, `NUM_FEATURES` + `CAT_FEATURES`).
-    2. Récupérer le modèle via `state["model"]`.
-    3. Appeler `model.predict(df)[0]` pour obtenir la classe prédite (str).
-    4. Appeler `model.predict_proba(df)[0]` pour obtenir les probabilités.
-       Les classes correspondantes sont dans `model.classes_`.
-    5. Construire et retourner un `PredictionResponse`.
-
-    Args:
-        item: caractéristiques de la machine (cf. `schemas.MachineInput`).
-
-    Returns:
-        PredictionResponse avec la classe prédite et les probabilités.
-    """
+    t0 = time.perf_counter()
     #1. Construit DataFrame
-    logger.info("1. Construit DataFrame ")
     df = pd.DataFrame([item.model_dump()])
 
     #2. Charge le modele
-    logger.info("2. Charge le modele ")
     model = state.get('model')
 
     #3. Classe predite
-    logger.info("3. Classe predite ")
     cl_pr = model.predict(df)[0]    
-    logger.info(cl_pr)
+    logger.info("Prédiction = {}",cl_pr)
+    logger.info("Temps mis pour la prédiction = {} {}",(time.perf_counter()-t0)*1000," ms")
 
     #4. Probabilités
-    logger.info("4. Probabiltes ")
     probas = model.predict_proba(df)[0]
     classes = model.classes_
-    logger.info(probas)
-    logger.info(classes)
 
     #5. Construction du PredictionResponse
-    logger.info("5. Construction du PredictionResponse ")
     probabilites = {}
     for c,p in zip(classes,probas):
         probabilites[c] = p
