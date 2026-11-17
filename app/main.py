@@ -25,6 +25,8 @@ from loguru import logger
 
 from app.schemas import HealthResponse, MachineInput, PredictionResponse
 
+import pandas as pd
+
 MODEL_PATH = Path(__file__).resolve().parents[1] / "model" / "model.joblib"
 
 # Mémoire d'application — peuplée par le lifespan
@@ -82,6 +84,8 @@ def health() -> HealthResponse:
 
 @app.post("/predict", response_model=PredictionResponse)
 def predict(item: MachineInput) -> PredictionResponse:
+    
+    logger.info("Lance Post predict ")
     """Prédit la criticité d'une machine à partir de ses caractéristiques.
 
     🎯 **À COMPLÉTER PAR L'APPRENANT.**
@@ -103,10 +107,34 @@ def predict(item: MachineInput) -> PredictionResponse:
     Returns:
         PredictionResponse avec la classe prédite et les probabilités.
     """
-    raise HTTPException(
-        status_code=501,
-        detail=(
-            "Endpoint /predict à implémenter — voir TODO dans app/main.py "
-            "et le mini-cours 01_FastAPI_essentiel.md."
-        ),
-    )
+    #1. Construit DataFrame
+    logger.info("1. Construit DataFrame ")
+    df = pd.DataFrame([item.model_dump()])
+
+    #2. Charge le modele
+    logger.info("2. Charge le modele ")
+    model = state.get('model')
+
+    #3. Classe predite
+    logger.info("3. Classe predite ")
+    cl_pr = model.predict(df)[0]    
+    logger.info(cl_pr)
+
+    #4. Probabilités
+    logger.info("4. Probabiltes ")
+    probas = model.predict_proba(df)[0]
+    classes = model.classes_
+    logger.info(probas)
+    logger.info(classes)
+
+    #5. Construction du PredictionResponse
+    logger.info("5. Construction du PredictionResponse ")
+    probabilites = {}
+    for c,p in zip(classes,probas):
+        probabilites[c] = p
+
+    return PredictionResponse(
+            criticite=cl_pr,
+            probabilites= probabilites
+        )
+
