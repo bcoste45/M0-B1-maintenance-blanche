@@ -104,6 +104,7 @@ def predict(item: MachineInput) -> PredictionResponse:
     t0 = time.perf_counter()
     #1. Construit DataFrame
     df = pd.DataFrame([item.model_dump()])
+    logger.info("Caractéristiques de la machine : {}",item.model_dump())
 
     #2. Charge le modele
     model = state.get('model')
